@@ -15,13 +15,24 @@
  */
 package io.netty.handler.codec.dns;
 
-/**
- * A DNS question.
- */
-public interface DnsQuestion extends DnsRecord {
-    /**
-     * An unused property. This method will always return {@code 0}.
-     */
+import io.netty.buffer.ByteBufHolder;
+
+public interface DnsRawRecord extends DnsRecord, ByteBufHolder {
     @Override
-    long timeToLive();
+    DnsRawRecord copy();
+
+    @Override
+    DnsRawRecord duplicate();
+
+    @Override
+    DnsRawRecord retain();
+
+    @Override
+    DnsRawRecord retain(int increment);
+
+    @Override
+    DnsRawRecord touch();
+
+    @Override
+    DnsRawRecord touch(Object hint);
 }

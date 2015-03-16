@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 The Netty Project
+ * Copyright 2015 The Netty Project
  *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
@@ -15,225 +15,151 @@
  */
 package io.netty.handler.codec.dns;
 
-import io.netty.util.AbstractReferenceCounted;
-import io.netty.util.ReferenceCountUtil;
-
-import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import io.netty.util.ReferenceCounted;
 
 /**
  * The message super-class which contains core information concerning DNS
  * packets, both outgoing and incoming.
  */
-public abstract class DnsMessage extends AbstractReferenceCounted {
-
-    private List<DnsQuestion> questions;
-    private List<DnsResource> answers;
-    private List<DnsResource> authority;
-    private List<DnsResource> additional;
-
-    private final DnsHeader header;
-
-    // Only allow to extend from same package
-    DnsMessage(int id) {
-        header = newHeader(id);
-    }
+public interface DnsMessage extends ReferenceCounted {
 
     /**
-     * Returns the header belonging to this message.
+     * Returns the 2 byte unsigned identifier number.
      */
-    public DnsHeader header() {
-        return header;
-    }
+    int id();
 
     /**
-     * Returns a list of all the questions in this message.
+     * Sets the ID of this message.
      */
-    public List<DnsQuestion> questions() {
-        if (questions == null) {
-            return Collections.emptyList();
-        }
-        return Collections.unmodifiableList(questions);
-    }
+    DnsMessage setId(int id);
 
     /**
-     * Returns a list of all the answer resource records in this message.
+     * Returns the 4 bit opcode.
      */
-    public List<DnsResource> answers() {
-        if (answers == null) {
-            return Collections.emptyList();
-        }
-        return Collections.unmodifiableList(answers);
-    }
+    DnsOpCode opCode();
 
     /**
-     * Returns a list of all the authority resource records in this message.
-     */
-    public List<DnsResource> authorityResources() {
-        if (authority == null) {
-            return Collections.emptyList();
-        }
-        return Collections.unmodifiableList(authority);
-    }
-
-    /**
-     * Returns a list of all the additional resource records in this message.
-     */
-    public List<DnsResource> additionalResources() {
-        if (additional == null) {
-            return Collections.emptyList();
-        }
-        return Collections.unmodifiableList(additional);
-    }
-
-    /**
-     * Adds an answer resource record to this message.
+     * Sets the opCode.
      *
-     * @param answer
-     *            the answer resource record to be added
      * @return the message to allow method chaining
      */
-    public DnsMessage addAnswer(DnsResource answer) {
-        if (answers == null) {
-            answers = new LinkedList<DnsResource>();
-        }
-        answers.add(answer);
-        return this;
-    }
+    DnsMessage setOpCode(DnsOpCode opCode);
 
     /**
-     * Adds a question to this message.
-     *
-     * @param question
-     *            the question to be added
-     * @return the message to allow method chaining
+     * Returns {@code true} if a query is to be pursued recursively.
      */
-    public DnsMessage addQuestion(DnsQuestion question) {
-        if (questions == null) {
-            questions = new LinkedList<DnsQuestion>();
-        }
-        questions.add(question);
-        return this;
-    }
+    boolean isRecursionDesired();
 
     /**
-     * Adds an authority resource record to this message.
+     * Sets whether a name server is directed to pursue a query recursively or not.
      *
-     * @param resource
-     *            the authority resource record to be added
+     * @param recursionDesired if set to {@code true}, pursues query recursively
      * @return the message to allow method chaining
      */
-    public DnsMessage addAuthorityResource(DnsResource resource) {
-        if (authority == null) {
-            authority = new LinkedList<DnsResource>();
-        }
-        authority.add(resource);
-        return this;
-    }
+    DnsMessage setRecursionDesired(boolean recursionDesired);
 
     /**
-     * Adds an additional resource record to this message.
-     *
-     * @param resource
-     *            the additional resource record to be added
-     * @return the message to allow method chaining
+     * Returns the 3 bit reserved field 'Z'.
      */
-    public DnsMessage addAdditionalResource(DnsResource resource) {
-        if (additional == null) {
-            additional = new LinkedList<DnsResource>();
-        }
-        additional.add(resource);
-        return this;
-    }
+    int z();
+
+    /**
+     * Sets the field Z. This field is reserved and should remain as 0 if the
+     * DNS server does not make usage of this field.
+     *
+     * @param z the value for the reserved field Z
+     */
+    DnsMessage setZ(int z);
+
+    /**
+     * Returns the number of records in the specified {@code section} of this message.
+     */
+    int count(DnsSection section);
+
+    /**
+     * Returns the number of records in this message.
+     */
+    int count();
+
+    /**
+     * Returns the first record in the specified {@code section} of this message.
+     * When the specified {@code section} is {@link DnsSection#QUESTION}, the type of the returned record is
+     * always {@link DnsQuestion}.
+     *
+     * @return {@code null} if this message doesn't have any records in the specified {@code section}.
+     */
+    <T extends DnsRecord> T recordAt(DnsSection section);
+
+    /**
+     * Returns the record at the specified {@code index} of the specified {@code section} of this message.
+     * When the specified {@code section} is {@link DnsSection#QUESTION}, the type of the returned record is
+     * always {@link DnsQuestion}.
+     *
+     * @throws IndexOutOfBoundsException if the specified {@code index} is out of bounds
+     */
+    <T extends DnsRecord> T recordAt(DnsSection section, int index);
+
+    /**
+     * Sets the specified {@code section} of this message to the specified {@code record},
+     * making it a single-record section. When the specified {@code section} is {@link DnsSection#QUESTION},
+     * the specified {@code record} must be a {@link DnsQuestion}.
+
+     */
+    DnsMessage setRecord(DnsSection section, DnsRecord record);
+
+    /**
+     * Sets the specified {@code record} at the specified {@code index} of the specified {@code section}
+     * of this message. When the specified {@code section} is {@link DnsSection#QUESTION},
+     * the specified {@code record} must be a {@link DnsQuestion}.
+     *
+     * @throws IndexOutOfBoundsException if the specified {@code index} is out of bounds
+     */
+    DnsMessage setRecord(DnsSection section, int index, DnsRecord record);
+
+    /**
+     * Adds the specified {@code record} at the end of the specified {@code section} of this message.
+     * When the specified {@code section} is {@link DnsSection#QUESTION}, the specified {@code record}
+     * must be a {@link DnsQuestion}.
+     */
+    DnsMessage addRecord(DnsSection section, DnsRecord record);
+
+    /**
+     * Adds the specified {@code record} at the specified {@code index} of the specified {@code section}
+     * of this message. When the specified {@code section} is {@link DnsSection#QUESTION}, the specified
+     * {@code record} must be a {@link DnsQuestion}.
+     *
+     * @throws IndexOutOfBoundsException if the specified {@code index} is out of bounds
+     */
+    DnsMessage addRecord(DnsSection section, int index, DnsRecord record);
+
+    /**
+     * Removes the record at the specified {@code index} of the specified {@code section}.
+     * When the specified {@code section} is {@link DnsSection#QUESTION}, the type of the returned record is
+     * always {@link DnsQuestion}.
+     *
+     * @return the removed record
+     */
+    <T extends DnsRecord> T removeRecord(DnsSection section, int index);
+
+    /**
+     * Removes all the records in the specified {@code section} of this message.
+     */
+    DnsMessage clear(DnsSection section);
+
+    /**
+     * Removes all the records in this message.
+     */
+    DnsMessage clear();
 
     @Override
-    protected void deallocate() {
-        // NOOP
-    }
+    DnsMessage touch();
 
     @Override
-    public boolean release() {
-        release(questions());
-        release(answers());
-        release(additionalResources());
-        release(authorityResources());
-        return super.release();
-    }
-
-    private static void release(List<?> resources) {
-        for (Object resource: resources) {
-            ReferenceCountUtil.release(resource);
-        }
-    }
+    DnsMessage touch(Object hint);
 
     @Override
-    public boolean release(int decrement) {
-        release(questions(), decrement);
-        release(answers(), decrement);
-        release(additionalResources(), decrement);
-        release(authorityResources(), decrement);
-        return super.release(decrement);
-    }
-
-    private static void release(List<?> resources, int decrement) {
-        for (Object resource: resources) {
-            ReferenceCountUtil.release(resource, decrement);
-        }
-    }
+    DnsMessage retain();
 
     @Override
-    public DnsMessage touch(Object hint) {
-        touch(questions(), hint);
-        touch(answers(), hint);
-        touch(additionalResources(), hint);
-        touch(authorityResources(), hint);
-        return this;
-    }
-
-    private static void touch(List<?> resources, Object hint) {
-        for (Object resource: resources) {
-            ReferenceCountUtil.touch(resource, hint);
-        }
-    }
-
-    @Override
-    public DnsMessage retain() {
-        retain(questions());
-        retain(answers());
-        retain(additionalResources());
-        retain(authorityResources());
-        super.retain();
-        return this;
-    }
-
-    private static void retain(List<?> resources) {
-        for (Object resource: resources) {
-            ReferenceCountUtil.retain(resource);
-        }
-    }
-
-    @Override
-    public DnsMessage retain(int increment) {
-        retain(questions(), increment);
-        retain(answers(), increment);
-        retain(additionalResources(), increment);
-        retain(authorityResources(), increment);
-        super.retain(increment);
-        return this;
-    }
-
-    private static void retain(List<?> resources, int increment) {
-        for (Object resource: resources) {
-            ReferenceCountUtil.retain(resource, increment);
-        }
-    }
-
-    @Override
-    public DnsMessage touch() {
-        super.touch();
-        return this;
-    }
-
-    protected abstract DnsHeader newHeader(int id);
+    DnsMessage retain(int increment);
 }
