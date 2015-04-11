@@ -114,13 +114,13 @@ public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey>
 
     private void runTaskQueue() {
         for (;;) {
-            AcquireTask<C, K> task = pendingAcquireQueue.peek();
-            if (task == null) {
-                break;
-            }
             if (acquiredChannelCount.decrementAndGet() <= maxConnections) {
-                pendingAcquireQueue.remove();
-
+                AcquireTask<C, K> task = pendingAcquireQueue.poll();
+                if (task == null) {
+                    // increment again as we was not able to poll a task.
+                    acquiredChannelCount.incrementAndGet();
+                    break;
+                }
                 Promise<C> promise = task.promise;
                 promise.addListener(decrementListener);
                 pool.acquire(task.key, promise);
