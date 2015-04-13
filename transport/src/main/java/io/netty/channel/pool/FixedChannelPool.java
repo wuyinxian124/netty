@@ -134,7 +134,7 @@ public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey>
         private final K key;
         private final Promise<C> promise;
 
-        AcquireTask(final K key, Promise<C> promise) {
+        public AcquireTask(final K key, Promise<C> promise) {
             this.key = key;
             this.promise = promise;
         }

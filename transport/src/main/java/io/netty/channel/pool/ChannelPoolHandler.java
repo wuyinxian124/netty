@@ -38,7 +38,8 @@ public interface ChannelPoolHandler<C extends Channel, K extends ChannelPoolKey>
     /**
      * Called once a {@link Channel} was acquired by calling {@link ChannelPool#acquire(ChannelPoolKey)} or
      * {@link ChannelPool#acquire(ChannelPoolKey, Promise)}.
-     *  @param ch       the {@link Channel}
+     *
+     * @param ch       the {@link Channel}
      * @param key       the {@link ChannelPoolKey} for which the {@link Channel} was acquired
      */
     void channelAcquired(C ch, K key);
