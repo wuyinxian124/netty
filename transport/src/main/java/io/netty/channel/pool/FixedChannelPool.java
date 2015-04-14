@@ -22,9 +22,11 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.Promise;
+import io.netty.util.internal.EmptyArrays;
 
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.netty.util.internal.ObjectUtil.checkNotNull;
@@ -37,9 +39,13 @@ import static io.netty.util.internal.ObjectUtil.checkNotNull;
  * @param <K>   the {@link ChannelPoolKey} that is used to store and lookup the {@link Channel}s.
  */
 public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey> implements ChannelPool<C, K> {
-
+    private static final IllegalStateException FULL_EXCEPTION =
+            new IllegalStateException("PendingAcquireQueue is full");
+    static {
+        FULL_EXCEPTION.setStackTrace(EmptyArrays.EMPTY_STACK_TRACE);
+    }
     private final AtomicInteger acquiredChannelCount = new AtomicInteger();
-    private final Queue<AcquireTask<C, K>> pendingAcquireQueue = new ConcurrentLinkedQueue<AcquireTask<C, K>>();
+    private final Queue<AcquireTask<C, K>> pendingAcquireQueue;
     private final FutureListener<C> decrementListener = new FutureListener<C>() {
         @Override
         public void operationComplete(Future<C> future) throws Exception {
@@ -70,10 +76,19 @@ public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey>
     private final int maxConnections;
 
     public FixedChannelPool(ChannelPool<C, K> pool, int maxConnections) {
+        this(pool, maxConnections, new ConcurrentLinkedQueue<AcquireTask<C, K>>());
+    }
+
+    public FixedChannelPool(ChannelPool<C, K> pool, int maxConnections, int maxPendingAcquires) {
+        this(pool, maxConnections, new LinkedBlockingDeque<AcquireTask<C, K>>(maxPendingAcquires));
+    }
+
+    private FixedChannelPool(ChannelPool<C, K> pool, int maxConnections, Queue<AcquireTask<C, K>> pendingAcquireQueue) {
         if (maxConnections < 1) {
             throw new IllegalArgumentException("maxConnections must be >= 1 but was " + maxConnections);
         }
         this.pool = checkNotNull(pool, "pool");
+        this.pendingAcquireQueue = checkNotNull(pendingAcquireQueue, "pendingAcquireQueue");
         this.maxConnections = maxConnections;
     }
 
@@ -93,7 +108,10 @@ public final class FixedChannelPool<C extends Channel, K extends ChannelPoolKey>
             promise.addListener(decrementListener);
             return pool.acquire(key, promise);
         }
-        pendingAcquireQueue.add(new AcquireTask<C, K>(key, promise));
+        if (!pendingAcquireQueue.offer(new AcquireTask<C, K>(key, promise))) {
+            acquiredChannelCount.decrementAndGet();
+            promise.setFailure(FULL_EXCEPTION);
+        }
         return promise;
     }
 
